@@ -1,0 +1,35 @@
+# Maven
+target/
+
+# Rust
+wasm-json-core/target/
+
+# IDEs and Editors
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.vscode/
+*.swp
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Project Docs / Local plan
+plan.txt
+quickstart.html
+installation.html
+
+# Dependencies / native libs
+lib/
+
+# Rust Build Artifacts
+**/target/
+Cargo.lock
+
+# Test Suites
+src/test/resources/JSONTestSuite/
