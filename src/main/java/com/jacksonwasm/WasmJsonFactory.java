@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,7 +41,8 @@ public class WasmJsonFactory extends MessagePackFactory {
         try {
             WasmBridge bridge = bridgePool.get();
             byte[] msgpackData = bridge.parse(inputBytes);
-            return super.createParser(msgpackData, 0, msgpackData.length);
+            // Using ByteArrayInputStream is more robust for MessagePackParser
+            return super.createParser(new ByteArrayInputStream(msgpackData));
         } catch (IOException e) {
             throw new JsonParseException(null, "Failed to parse JSON via Wasm: " + e.getMessage(), e);
         }
@@ -85,4 +87,36 @@ public class WasmJsonFactory extends MessagePackFactory {
         byte[] data = new String(content, offset, len).getBytes(StandardCharsets.UTF_8);
         return createParser(data, 0, data.length);
     }
+
+    @Override
+    public JsonParser createParser(java.io.File f) throws IOException {
+        byte[] data = java.nio.file.Files.readAllBytes(f.toPath());
+        return createParser(data, 0, data.length);
+    }
+
+    @Override
+    public JsonParser createParser(java.net.URL url) throws IOException {
+        try (InputStream in = url.openStream()) {
+            return createParser(in);
+        }
+    }
+
+    @Override
+    public JsonParser createParser(char[] content) throws IOException {
+        return createParser(content, 0, content.length);
+    }
+
+    @Override
+    public JsonParser createParser(java.io.DataInput in) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        try {
+            while (true) {
+                buffer.write(in.readByte());
+            }
+        } catch (java.io.EOFException e) {
+            // End of input reached
+        }
+        return createParser(buffer.toByteArray(), 0, buffer.size());
+    }
 }
+

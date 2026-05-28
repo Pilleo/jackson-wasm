@@ -5,7 +5,9 @@ import com.dylibso.chicory.runtime.Memory;
 import com.dylibso.chicory.wasm.WasmModule;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.types.Value;
+import com.dylibso.chicory.compiler.MachineFactoryCompiler;
 import java.io.IOException;
+
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -28,7 +30,9 @@ public class WasmBridge implements AutoCloseable {
     private final Memory memory;
 
     public WasmBridge() {
-        this.instance = Instance.builder(MODULE).build();
+        this.instance = Instance.builder(MODULE)
+            .withMachineFactory(MachineFactoryCompiler::compile)
+            .build();
         this.memory = instance.memory();
     }
 

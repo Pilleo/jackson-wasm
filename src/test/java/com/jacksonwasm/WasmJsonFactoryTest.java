@@ -12,6 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 
 public class WasmJsonFactoryTest {
 
@@ -26,6 +28,7 @@ public class WasmJsonFactoryTest {
         assertEquals("Alice", user.name());
         assertEquals(30, user.age());
     }
+
 
     @Test
     public void testNullHandling() throws Exception {
@@ -63,4 +66,25 @@ public class WasmJsonFactoryTest {
         assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
         assertEquals(threadCount * requestsPerThread, successCount.get());
     }
+
+    @Test
+    public void testFactoryCopy() throws Exception {
+        WasmJsonFactory factory = new WasmJsonFactory();
+        WasmJsonFactory copy = factory.copy();
+        ObjectMapper mapper = new ObjectMapper(copy);
+        String json = "{\"copyTest\": true}";
+        var node = mapper.readTree(json);
+        assertTrue(node.get("copyTest").asBoolean());
+    }
+
+    @Test
+    public void testExcessivelyNestedJson() throws Exception {
+        // Deeply nested JSON array to trigger the Wasm/serde_json recursion limits
+        String json = "[".repeat(200) + "1" + "]".repeat(200);
+        ObjectMapper mapper = new ObjectMapper(new WasmJsonFactory());
+        assertThrows(com.fasterxml.jackson.core.JsonParseException.class, () -> {
+            mapper.readTree(json);
+        });
+    }
 }
+
