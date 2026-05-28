@@ -1,28 +1,96 @@
-# Jackson-WASM
+# Jackson WASM
 
-This project is a WebAssembly (WASM) implementation of the Jackson JSON processor. It allows you to use Jackson's powerful JSON processing capabilities in a web browser or other WASM-compatible environments.
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-## Building the Project
+A Jackson-compatible `JsonFactory` that offloads JSON parsing to a high-performance, sandboxed WebAssembly (WASM) module written in Rust.
 
-The project is built using Apache Maven. To build the project, run the following command in the root directory:
+## Overview
 
-```bash
-mvn clean install
+`jackson-wasm` allows you to leverage the security and performance of Rust's `serde_json` within your existing Jackson-based Java applications. By running the core parser inside a WebAssembly sandbox, you gain an extra layer of protection against memory-related vulnerabilities when processing untrusted JSON.
+
+### Why Jackson WASM?
+
+*   **Security (Sandboxed Execution):** The parser runs in an isolated linear memory space. It has no access to the host system, files, or network.
+*   **Memory Safety:** Built on Rust's `serde_json`, minimizing common parsing vulnerabilities.
+*   **Seamless Integration:** Plugs directly into Jackson's `ObjectMapper`. Your data-binding code remains unchanged.
+*   **Runtime Independence:** Uses [Chicory](https://github.com/dylibso/chicory), a pure-Java WASM runtime, requiring no native libraries (JNI/JNA).
+
+## Architecture
+
+The project bridges the JVM and WASM worlds through a MessagePack intermediary:
+
+1.  **Java Layer**: `WasmJsonFactory` intercepts JSON input.
+2.  **Bridge Layer**: `WasmBridge` manages the Chicory WASM runtime and memory.
+3.  **WASM Layer (Rust)**: The Rust module parses JSON into an AST and re-serializes it into **MessagePack**.
+4.  **Java Layer**: Jackson's `MessagePackFactory` consumes the MessagePack stream to perform standard data binding.
+
+```text
+[JSON Input] -> [WasmJsonFactory] -> [WasmBridge]
+                                         |
+                                         v
+                                  [Rust/WASM Parser]
+                                         |
+                                         v
+[ObjectMapper] <- [MessagePackParser] <- [MessagePack Output]
 ```
 
-This will produce the necessary WASM artifacts in the `target` directory.
+## Getting Started
+
+### Prerequisites
+
+*   **Java 25+**
+*   **Rust (stable)** with `wasm32-unknown-unknown` target
+*   **Maven 3.9+**
+
+### Building from Source
+
+1.  **Build the WASM Core:**
+    ```bash
+    cd wasm-json-core
+    cargo build --target wasm32-unknown-unknown --release
+    cp target/wasm32-unknown-unknown/release/wasm_json_core.wasm ../src/main/resources/
+    cd ..
+    ```
+
+2.  **Build the Java Library:**
+    ```bash
+    mvn clean install
+    ```
 
 ## Usage
 
-The `quickstart.html` and `installation.html` files provide examples of how to use the WASM module in a web page.
+Simply pass `WasmJsonFactory` to your `ObjectMapper` initialization:
 
-## Security Considerations
+```java
+import com.jacksonwasm.WasmJsonFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-When using this library, it is important to be aware of the following security considerations:
+public class Main {
+    public static void main(String[] args) throws Exception {
+        // 1. Initialize with WASM factory
+        ObjectMapper mapper = new ObjectMapper(new WasmJsonFactory());
 
-*   **Input Validation:** As with any JSON processing library, it is crucial to validate and sanitize any untrusted JSON input. Maliciously crafted JSON data could potentially cause unexpected behavior or security vulnerabilities.
-*   **Resource Limits:** Processing large or deeply nested JSON documents could consume significant memory and CPU resources. It is recommended to set appropriate limits on the size and complexity of the JSON data that you process to prevent denial-of-service attacks.
-*   **WASM Environment Security:** The security of the WASM environment itself is also important. Ensure that you are using a secure and up-to-date WASM runtime and that you follow best practices for sandboxing and isolating WASM modules.
-*   **Cross-Site Scripting (XSS):** When rendering data from this library into a web page, be sure to properly escape any user-controllable data to prevent XSS vulnerabilities.
+        // 2. Use as you normally would
+        String json = "{\"name\": \"WebAssembly\", \"status\": \"awesome\"}";
+        MyData data = mapper.readValue(json, MyData.class);
 
-By being mindful of these security considerations, you can use Jackson-WASM to safely and efficiently process JSON data in your web applications.
+        System.out.println(data.getName()); // Output: WebAssembly
+    }
+}
+```
+
+## Performance Considerations
+
+While WebAssembly provides a secure sandbox, there is a small overhead for:
+1.  Copying memory between the JVM and WASM linear memory.
+2.  The intermediate translation from JSON to MessagePack.
+
+For most applications, this overhead is negligible compared to the security benefits, especially when dealing with untrusted inputs.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
