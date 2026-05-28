@@ -14,6 +14,7 @@ import java.nio.ByteOrder;
 
 public class WasmBridge implements AutoCloseable {
     private static final WasmModule MODULE;
+    private static final java.util.function.Function<com.dylibso.chicory.runtime.Instance, com.dylibso.chicory.runtime.Machine> MACHINE_FACTORY;
 
     static {
         try (InputStream wasmStream = WasmBridge.class.getResourceAsStream("/wasm_json_core.wasm")) {
@@ -21,6 +22,7 @@ public class WasmBridge implements AutoCloseable {
                 throw new IllegalStateException("Could not find wasm_json_core.wasm in resources");
             }
             MODULE = Parser.parse(wasmStream);
+            MACHINE_FACTORY = MachineFactoryCompiler.compile(MODULE);
         } catch (IOException e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -31,7 +33,7 @@ public class WasmBridge implements AutoCloseable {
 
     public WasmBridge() {
         this.instance = Instance.builder(MODULE)
-            .withMachineFactory(MachineFactoryCompiler::compile)
+            .withMachineFactory(MACHINE_FACTORY)
             .build();
         this.memory = instance.memory();
     }
